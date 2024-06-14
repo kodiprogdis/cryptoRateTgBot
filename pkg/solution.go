@@ -7,6 +7,7 @@ import (
 	"github.com/joho/godotenv"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -18,6 +19,11 @@ type CoinInfo struct {
 	AssetIdBase  string  `json:"base"`
 	AssetIdQuote string  `json:"quote"`
 	Rate         float64 `json:"rate"`
+}
+
+func roundFloat(val float64, precision uint) float64 {
+	ratio := math.Pow(10, float64(precision))
+	return math.Round(val*ratio) / ratio
 }
 
 func getPrice(amount int, coin1 string, coin2 string) string {
@@ -44,7 +50,7 @@ func getPrice(amount int, coin1 string, coin2 string) string {
 		fmt.Println("Ошибка чтения JSON-данных:", err2)
 	}
 	log.Println(string(respBody))
-	return fmt.Sprint(coininfo.Rate * float64(amount))
+	return fmt.Sprint(roundFloat(coininfo.Rate*float64(amount), 3))
 }
 
 func main() {
@@ -70,13 +76,15 @@ func main() {
 		}
 		_l := strings.Split(update.InlineQuery.Query, " ")
 
-		if len(_l) == 3 {
+		switch len(_l) {
+		case 3:
 			amount, _ := strconv.Atoi(_l[0])
-			title_article := fmt.Sprintf("Неверный формат данных\n @%s 1 USD RUB", bot.Self.UserName)
+			// title_article := fmt.Sprintf("Неверный формат данных\n @%s 1 USD RUB", bot.Self.UserName)
+			answer := _l[0] + " " + _l[1] + " = " + getPrice(amount, _l[1], _l[2]) + " " + _l[2]
 			article := tgbotapi.NewInlineQueryResultArticle(update.InlineQuery.ID,
-				title_article,
-				getPrice(amount, _l[1], _l[2]))
-			article.Description = getPrice(amount, _l[1], _l[2])
+				"Курс:",
+				answer)
+			article.Description = answer
 
 			inlineConf := tgbotapi.InlineConfig{
 				InlineQueryID: update.InlineQuery.ID,
@@ -88,8 +96,27 @@ func main() {
 			if _, err := bot.Request(inlineConf); err != nil {
 				log.Println(err)
 			}
-		}
+		case 2:
+			amount := 1
+			// title_article := fmt.Sprintf("Неверный формат данных\n @%s 1 USD RUB", bot.Self.UserName)
+			answer := "1" + " " + _l[0] + " = " + getPrice(amount, _l[0], _l[1]) + " " + _l[1]
+			article := tgbotapi.NewInlineQueryResultArticle(update.InlineQuery.ID,
+				"Курс:",
+				answer)
+			article.Description = answer
 
+			inlineConf := tgbotapi.InlineConfig{
+				InlineQueryID: update.InlineQuery.ID,
+				IsPersonal:    true,
+				CacheTime:     0,
+				Results:       []interface{}{article},
+			}
+
+			if _, err := bot.Request(inlineConf); err != nil {
+				log.Println(err)
+			}
+
+		}
 	}
 
 }
